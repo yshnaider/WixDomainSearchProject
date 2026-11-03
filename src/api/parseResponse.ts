@@ -1,14 +1,14 @@
-import type { APIResponse } from '@playwright/test';
+import type { APIResponse, Response } from '@playwright/test';
 import { z } from 'zod';
 
 const BODY_EXCERPT_LENGTH = 300;
 
 /**
  * Parses a response body with a Zod schema. Fails with the status, path, and reason when the
- * body isn't JSON or doesn't match the schema.
+ * body isn't JSON or doesn't match the schema. Accepts API responses and the browser's responses.
  */
 export async function parseResponse<T extends z.ZodType>(
-  response: APIResponse,
+  response: APIResponse | Response,
   schema: T,
 ): Promise<z.infer<T>> {
   const source = `${response.status()} ${new URL(response.url()).pathname}`;

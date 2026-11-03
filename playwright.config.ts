@@ -34,7 +34,15 @@ export default defineConfig({
     {
       name: 'chromium',
       testDir: './tests/ui',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        /* Wix localizes by browser language; the tests expect English pages. */
+        locale: 'en-US',
+        /* Wix's own test hooks, so getByTestId finds data-hook attributes. */
+        testIdAttribute: 'data-hook',
+        screenshot: 'only-on-failure',
+        video: 'retain-on-failure',
+      },
     },
   ],
 });

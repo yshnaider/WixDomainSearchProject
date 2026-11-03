@@ -1,136 +1,143 @@
-import type { APIResponse } from '@playwright/test';
-import type { DomainSearch } from '../../src/api/domainSearch/DomainSearch';
 import {
-  apiErrorSchema,
+  SUGGEST_DOMAINS_LIMITS,
+  SUGGEST_DOMAINS_PARAMS,
+} from '../../src/api/domainSearch/DomainSearch';
+import {
+  VIOLATION_FIELDS,
+  suggestDomainsErrorCodeSchema,
   suggestDomainsResponseSchema,
   type ApiError,
   type SuggestDomainsResponse,
 } from '../../src/api/domainSearch/domainSearch.schemas';
-import { parseResponse } from '../../src/api/parseResponse';
+import { authHeaders } from '../../src/api/authHeaders';
+import { HTTP_STATUS } from '../../src/api/httpStatus';
+import { toQueryString } from '../../src/api/queryString';
 import { getApiEnv } from '../../src/config/env';
 import { expect, test } from '../../src/fixtures/api.fixture';
+import {
+  ENCODED_TLDS_KEY,
+  INVALID_API_KEY,
+  INVALID_CURSOR,
+  INVALID_NUMBERS,
+  MIN_RESULTS,
+  PAGE_SIZES,
+  PATTERNS,
+  QUERIES,
+  TLDS,
+  stringOfLength,
+} from '../../src/fixtures/testData';
+import { domainName, tldOf } from '../../src/utils/domain';
+import {
+  expectClientError,
+  expectErrorStatus,
+  expectNoServerError,
+  expectSuccess,
+  violatedFields,
+} from './support/expectResponse';
+import { fetchAllPages } from './support/pagination';
 
-const QUERY = 'sunnybakery';
-const VALID_DOMAIN = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
-const MAX_PAGES = 20;
-
-const domainName = (domain: string) => domain.slice(0, domain.indexOf('.'));
-
-const violatedFields = (error: ApiError) =>
-  error.details.validationError?.fieldViolations.map((violation) => violation.field) ?? [];
+const PARAMS = SUGGEST_DOMAINS_PARAMS;
+const LIMITS = SUGGEST_DOMAINS_LIMITS;
+const ERROR_CODES = suggestDomainsErrorCodeSchema.enum;
 
 const returnedDomains = (body: SuggestDomainsResponse | ApiError) =>
   'suggestions' in body ? body.suggestions.map((suggestion) => suggestion.domain) : [];
 
-const describeResponse = async (response: APIResponse) =>
-  `got ${response.status()}: ${(await response.text()) || '(empty body)'}`;
-
-async function expectSuccess(response: APIResponse): Promise<SuggestDomainsResponse> {
-  expect(response.status(), `expected 200, ${await describeResponse(response)}`).toBe(200);
-  return parseResponse(response, suggestDomainsResponseSchema);
-}
-
-async function expectClientError(response: APIResponse): Promise<ApiError> {
-  const status = response.status();
-  expect(status >= 400 && status < 500, `expected 4xx, ${await describeResponse(response)}`).toBe(
-    true,
-  );
-  return parseResponse(response, apiErrorSchema);
-}
-
-/** Accepts either a success or a 4xx body, for rows where both outcomes are allowed. */
-async function expectNoServerError(response: APIResponse) {
-  expect(response.status(), `expected no 5xx, ${await describeResponse(response)}`).toBeLessThan(
-    500,
-  );
-  return parseResponse(response, suggestDomainsResponseSchema.or(apiErrorSchema));
-}
-
-async function fetchAllPages(domainSearch: DomainSearch, query: string, limit: number) {
-  const pages: SuggestDomainsResponse[] = [];
-  let cursor: string | undefined;
-  do {
-    pages.push(
-      await expectSuccess(await domainSearch.suggestDomains({ query, paging: { limit, cursor } })),
-    );
-    if (pages.length > MAX_PAGES) {
-      throw new Error(`Stopped after ${MAX_PAGES} pages of "${query}": cursors.next never ran out`);
-    }
-    cursor = pages.at(-1)?.pagingMetadata.cursors.next;
-  } while (cursor);
-  return pages;
-}
+const domainsOutside = (body: SuggestDomainsResponse, tld: string) =>
+  body.suggestions.map((suggestion) => suggestion.domain).filter((domain) => tldOf(domain) !== tld);
 
 test.describe('suggest-domains', () => {
   test('SD-01 returns a page of suggestions', { tag: '@smoke' }, async ({ domainSearch }) => {
     const body = await expectSuccess(
-      await domainSearch.suggestDomains({ query: QUERY, paging: { limit: 10 } }),
+      await domainSearch.suggestDomains({
+        query: QUERIES.default,
+        paging: { limit: PAGE_SIZES.default },
+      }),
+      suggestDomainsResponseSchema,
     );
 
-    expect(body.suggestions.length).toBeGreaterThanOrEqual(1);
-    expect(body.suggestions.length).toBeLessThanOrEqual(10);
+    expect(body.suggestions.length).toBeGreaterThanOrEqual(MIN_RESULTS);
+    expect(body.suggestions.length).toBeLessThanOrEqual(PAGE_SIZES.default);
     expect(body.pagingMetadata.count).toBe(body.suggestions.length);
   });
 
   test('SD-02 returns suggestions without prices', { tag: '@sanity' }, async ({ domainSearch }) => {
-    const response = await domainSearch.suggestDomains({ query: QUERY, paging: { limit: 10 } });
+    const response = await domainSearch.suggestDomains({
+      query: QUERIES.default,
+      paging: { limit: PAGE_SIZES.default },
+    });
 
-    const body = await expectSuccess(response);
-    expect(body.suggestions.length).toBeGreaterThanOrEqual(1);
+    const body = await expectSuccess(response, suggestDomainsResponseSchema);
+    expect(body.suggestions.length).toBeGreaterThanOrEqual(MIN_RESULTS);
     expect(await response.text(), 'no response key mentions a price').not.toMatch(
-      /"[^"]*price[^"]*":/i,
+      PATTERNS.priceKey,
     );
   });
 
   test('SD-03 accepts a 1-character query', { tag: '@edge' }, async ({ domainSearch }) => {
-    const body = await expectSuccess(await domainSearch.suggestDomains({ query: 'a' }));
+    const body = await expectSuccess(
+      await domainSearch.suggestDomains({ query: stringOfLength(LIMITS.queryMinLength) }),
+      suggestDomainsResponseSchema,
+    );
 
     expect(body.pagingMetadata.count).toBe(body.suggestions.length);
   });
 
   test('SD-04 accepts a 100-character query', { tag: '@edge' }, async ({ domainSearch }) => {
-    const body = await expectSuccess(await domainSearch.suggestDomains({ query: 'a'.repeat(100) }));
+    const body = await expectSuccess(
+      await domainSearch.suggestDomains({ query: stringOfLength(LIMITS.queryMaxLength) }),
+      suggestDomainsResponseSchema,
+    );
 
     expect(body.pagingMetadata.count).toBe(body.suggestions.length);
   });
 
   test('SD-05 rejects a 101-character query', { tag: '@edge' }, async ({ domainSearch }) => {
     const error = await expectClientError(
-      await domainSearch.suggestDomains({ query: 'a'.repeat(101) }),
+      await domainSearch.suggestDomains({ query: stringOfLength(LIMITS.queryMaxLength + 1) }),
     );
 
-    expect(violatedFields(error)).toContain('query');
+    expect(violatedFields(error)).toContain(VIOLATION_FIELDS.query);
   });
 
   test('SD-06 rejects an empty or missing query', { tag: '@edge' }, async ({ domainSearch }) => {
     await test.step('empty query', async () => {
-      const error = await expectClientError(await domainSearch.suggestDomains({ query: '' }));
-      expect(violatedFields(error)).toContain('query');
+      const error = await expectClientError(
+        await domainSearch.suggestDomains({ query: QUERIES.empty }),
+      );
+      expect(violatedFields(error)).toContain(VIOLATION_FIELDS.query);
     });
 
     await test.step('no query parameter', async () => {
       const error = await expectClientError(
-        await domainSearch.suggestDomainsRaw('paging.limit=10'),
+        await domainSearch.suggestDomainsRaw(
+          toQueryString({ [PARAMS.pagingLimit]: PAGE_SIZES.default }),
+        ),
       );
-      expect(violatedFields(error)).toContain('query');
+      expect(violatedFields(error)).toContain(VIOLATION_FIELDS.query);
     });
   });
 
   test('SD-07 rejects a spaces-only query', { tag: '@edge' }, async ({ domainSearch }) => {
-    const error = await expectClientError(await domainSearch.suggestDomains({ query: '   ' }));
+    const error = await expectClientError(
+      await domainSearch.suggestDomains({ query: QUERIES.spacesOnly }),
+    );
 
-    expect(error.message).not.toBe('');
+    expect(error.message).toBeTruthy();
   });
 
   test(
     'SD-09 handles Unicode and special characters',
     { tag: '@edge' },
     async ({ domainSearch }) => {
-      for (const query of ['café', 'Bread & Butter']) {
+      for (const query of [QUERIES.unicode, QUERIES.specialCharacters]) {
         await test.step(query, async () => {
-          const body = await expectNoServerError(await domainSearch.suggestDomains({ query }));
+          const body = await expectNoServerError(
+            await domainSearch.suggestDomains({ query }),
+            suggestDomainsResponseSchema,
+          );
           for (const domain of returnedDomains(body)) {
-            expect(domain).toMatch(VALID_DOMAIN);
+            expect(domain).toMatch(PATTERNS.validDomain);
           }
         });
       }
@@ -138,23 +145,15 @@ test.describe('suggest-domains', () => {
   );
 
   test('SD-10 returns only the requested TLDs', { tag: '@sanity' }, async ({ domainSearch }) => {
+    const requested: string[] = [TLDS.com, TLDS.net];
     const body = await expectSuccess(
-      await domainSearch.suggestDomains({ query: QUERY, tlds: ['com', 'net'] }),
+      await domainSearch.suggestDomains({ query: QUERIES.default, tlds: requested }),
+      suggestDomainsResponseSchema,
     );
 
-    expect(body.suggestions.length).toBeGreaterThanOrEqual(1);
+    expect(body.suggestions.length).toBeGreaterThanOrEqual(MIN_RESULTS);
     for (const { domain } of body.suggestions) {
-      expect(domain).toMatch(/\.(com|net)$/);
-    }
-  });
-
-  test('SD-11 filters by a multi-level TLD', { tag: '@edge' }, async ({ domainSearch }) => {
-    const body = await expectNoServerError(
-      await domainSearch.suggestDomains({ query: QUERY, tlds: ['co.il'] }),
-    );
-
-    for (const domain of returnedDomains(body)) {
-      expect(domain).toMatch(/\.co\.il$/);
+      expect(requested, domain).toContain(tldOf(domain));
     }
   });
 
@@ -163,35 +162,51 @@ test.describe('suggest-domains', () => {
     { tag: '@sanity' },
     async ({ domainSearch }) => {
       const body = await expectSuccess(
-        await domainSearch.suggestDomains({ query: QUERY, tlds: ['net'] }),
+        await domainSearch.suggestDomains({ query: QUERIES.default, tlds: [TLDS.net] }),
+        suggestDomainsResponseSchema,
       );
 
-      expect(body.suggestions.length).toBeGreaterThanOrEqual(1);
-      const otherTlds = body.suggestions.map((s) => s.domain).filter((d) => !d.endsWith('.net'));
-      expect(otherTlds, 'suggestions outside the requested .net').toEqual([]);
+      expect(body.suggestions.length).toBeGreaterThanOrEqual(MIN_RESULTS);
+      expect(domainsOutside(body, TLDS.net), 'suggestions outside the requested .net').toEqual([]);
     },
   );
+
+  test('SD-11 filters by a multi-level TLD', { tag: '@edge' }, async ({ domainSearch }) => {
+    const body = await expectNoServerError(
+      await domainSearch.suggestDomains({ query: QUERIES.default, tlds: [TLDS.multiLevel] }),
+      suggestDomainsResponseSchema,
+    );
+
+    for (const domain of returnedDomains(body)) {
+      expect(tldOf(domain), domain).toBe(TLDS.multiLevel);
+    }
+  });
 
   test('SD-12 ignores an encoded tlds key', { tag: '@edge' }, async ({ domainSearch }) => {
     // Control: the raw key filters. Uses com, the only TLD the filter honors today.
     await test.step('raw tlds[]=com filters', async () => {
       const body = await expectSuccess(
-        await domainSearch.suggestDomainsRaw(`query=${QUERY}&tlds[]=com`),
+        await domainSearch.suggestDomainsRaw(
+          toQueryString({ [PARAMS.query]: QUERIES.default, [PARAMS.tlds]: TLDS.com }),
+        ),
+        suggestDomainsResponseSchema,
       );
-      expect(body.suggestions.length).toBeGreaterThanOrEqual(1);
-      const otherTlds = body.suggestions.map((s) => s.domain).filter((d) => !d.endsWith('.com'));
-      expect(otherTlds, 'raw tlds[]=com returned other TLDs').toEqual([]);
+      expect(body.suggestions.length).toBeGreaterThanOrEqual(MIN_RESULTS);
+      expect(domainsOutside(body, TLDS.com), 'raw tlds[]=com returned other TLDs').toEqual([]);
     });
 
     await test.step('encoded tlds%5B%5D=com is ignored', async () => {
       const body = await expectSuccess(
-        await domainSearch.suggestDomainsRaw(`query=${QUERY}&tlds%5B%5D=com`),
+        await domainSearch.suggestDomainsRaw(
+          toQueryString({ [PARAMS.query]: QUERIES.default, [ENCODED_TLDS_KEY]: TLDS.com }),
+        ),
+        suggestDomainsResponseSchema,
       );
-      const domains = body.suggestions.map((s) => s.domain);
+      const domains = body.suggestions.map((suggestion) => suggestion.domain);
       expect(
-        domains.some((d) => !d.endsWith('.com')),
+        domainsOutside(body, TLDS.com),
         `encoded key filtered to .com anyway: ${domains.join(', ')}`,
-      ).toBe(true);
+      ).not.toEqual([]);
     });
   });
 
@@ -200,16 +215,17 @@ test.describe('suggest-domains', () => {
     { tag: '@edge' },
     async ({ domainSearch }) => {
       const cases = [
-        { tld: 'notarealtld', code: 'TLD_NOT_SUPPORTED' },
-        { tld: '.com', code: 'INVALID_TLD_FORMAT' },
+        { tld: TLDS.unsupported, code: ERROR_CODES.TLD_NOT_SUPPORTED },
+        { tld: TLDS.withDot, code: ERROR_CODES.INVALID_TLD_FORMAT },
       ];
       for (const { tld, code } of cases) {
         await test.step(tld, async () => {
-          const response = await domainSearch.suggestDomains({ query: QUERY, tlds: [tld] });
-          expect(response.status()).toBe(400);
-          const error = await parseResponse(response, apiErrorSchema);
+          const error = await expectErrorStatus(
+            await domainSearch.suggestDomains({ query: QUERIES.default, tlds: [tld] }),
+            HTTP_STATUS.BAD_REQUEST,
+          );
           expect(error.message).toBe(code);
-          expect(violatedFields(error)).toContain('tlds');
+          expect(violatedFields(error)).toContain(VIOLATION_FIELDS.tlds);
         });
       }
     },
@@ -217,34 +233,38 @@ test.describe('suggest-domains', () => {
 
   test('SD-14 respects maxLength', { tag: '@sanity' }, async ({ domainSearch }) => {
     // Suggestions are never shorter than the query, so maxLength must not be below its length.
-    const maxLength = 12;
+    const maxLength = QUERIES.default.length + 1;
     const body = await expectSuccess(
-      await domainSearch.suggestDomains({ query: QUERY, maxLength }),
+      await domainSearch.suggestDomains({ query: QUERIES.default, maxLength }),
+      suggestDomainsResponseSchema,
     );
 
-    expect(body.suggestions.length).toBeGreaterThanOrEqual(1);
+    expect(body.suggestions.length).toBeGreaterThanOrEqual(MIN_RESULTS);
     for (const { domain } of body.suggestions) {
       expect(domainName(domain).length, domain).toBeLessThanOrEqual(maxLength);
     }
   });
 
   test('SD-15 rejects an invalid maxLength', { tag: '@edge' }, async ({ domainSearch }) => {
-    for (const maxLength of ['0', '-1', 'abc']) {
+    for (const maxLength of INVALID_NUMBERS) {
       await test.step(`maxLength=${maxLength}`, async () => {
         await expectClientError(
-          await domainSearch.suggestDomainsRaw(`query=${QUERY}&maxLength=${maxLength}`),
+          await domainSearch.suggestDomainsRaw(
+            toQueryString({ [PARAMS.query]: QUERIES.default, [PARAMS.maxLength]: maxLength }),
+          ),
         );
       });
     }
   });
 
   test('SD-16 accepts the paging.limit boundaries', { tag: '@edge' }, async ({ domainSearch }) => {
-    for (const limit of [1, 50]) {
+    for (const limit of [LIMITS.pagingLimitMin, LIMITS.pagingLimitMax]) {
       await test.step(`paging.limit=${limit}`, async () => {
         const body = await expectSuccess(
-          await domainSearch.suggestDomains({ query: QUERY, paging: { limit } }),
+          await domainSearch.suggestDomains({ query: QUERIES.default, paging: { limit } }),
+          suggestDomainsResponseSchema,
         );
-        expect(body.suggestions.length).toBeGreaterThanOrEqual(1);
+        expect(body.suggestions.length).toBeGreaterThanOrEqual(MIN_RESULTS);
         expect(body.suggestions.length).toBeLessThanOrEqual(limit);
         expect(body.pagingMetadata.count).toBe(body.suggestions.length);
       });
@@ -252,48 +272,59 @@ test.describe('suggest-domains', () => {
   });
 
   test('SD-17 rejects an out-of-range paging.limit', { tag: '@edge' }, async ({ domainSearch }) => {
-    for (const limit of [0, 51]) {
+    for (const limit of [LIMITS.pagingLimitMin - 1, LIMITS.pagingLimitMax + 1]) {
       await test.step(`paging.limit=${limit}`, async () => {
         const error = await expectClientError(
-          await domainSearch.suggestDomains({ query: QUERY, paging: { limit } }),
+          await domainSearch.suggestDomains({ query: QUERIES.default, paging: { limit } }),
         );
-        expect(violatedFields(error)).toContain('paging.limit');
+        expect(violatedFields(error)).toContain(VIOLATION_FIELDS.pagingLimit);
       });
     }
   });
 
   test('SD-18 pages through every result', { tag: '@sanity' }, async ({ domainSearch }) => {
-    const limit = 5;
-    const pages = await fetchAllPages(domainSearch, QUERY, limit);
+    const pages = await fetchAllPages(domainSearch, QUERIES.default, PAGE_SIZES.pageWalk);
 
     for (const { suggestions, pagingMetadata } of pages) {
-      expect(suggestions.length).toBeLessThanOrEqual(limit);
+      expect(suggestions.length).toBeLessThanOrEqual(PAGE_SIZES.pageWalk);
       expect(pagingMetadata.count).toBe(suggestions.length);
     }
     const domains = pages.flatMap((page) => page.suggestions.map((s) => s.domain));
     expect(new Set(domains).size, 'no domain appears on two pages').toBe(domains.length);
-    const expectedHasNext = pages.map((_, index) => index < pages.length - 1);
+    const lastPage = pages.length - 1;
+    const expectedHasNext = pages.map((_, index) => index < lastPage);
     expect(pages.map((page) => page.pagingMetadata.hasNext)).toEqual(expectedHasNext);
   });
 
   test('SD-19 rejects an invalid cursor', { tag: '@edge' }, async ({ domainSearch }) => {
     await expectClientError(
-      await domainSearch.suggestDomains({ query: QUERY, paging: { cursor: 'garbage' } }),
+      await domainSearch.suggestDomains({
+        query: QUERIES.default,
+        paging: { cursor: INVALID_CURSOR },
+      }),
     );
   });
 
   test('SD-20 rejects a cursor from another query', { tag: '@edge' }, async ({ domainSearch }) => {
     const firstPage = await expectSuccess(
-      await domainSearch.suggestDomains({ query: QUERY, paging: { limit: 2 } }),
+      await domainSearch.suggestDomains({
+        query: QUERIES.default,
+        paging: { limit: PAGE_SIZES.cursorSource },
+      }),
+      suggestDomainsResponseSchema,
     );
     const cursor = firstPage.pagingMetadata.cursors.next;
-    expect(cursor, `"${QUERY}" with paging.limit=2 returned no next cursor`).toBeDefined();
+    expect(cursor, `"${QUERIES.default}" returned no next cursor`).toBeDefined();
 
     const body = await expectNoServerError(
-      await domainSearch.suggestDomains({ query: 'greenleaf', paging: { cursor } }),
+      await domainSearch.suggestDomains({ query: QUERIES.other, paging: { cursor } }),
+      suggestDomainsResponseSchema,
     );
     for (const domain of returnedDomains(body)) {
-      expect(domain, 'a greenleaf request returned a sunnybakery result').not.toContain(QUERY);
+      expect(
+        domain,
+        `a "${QUERIES.other}" request returned a "${QUERIES.default}" result`,
+      ).not.toContain(QUERIES.default);
     }
   });
 
@@ -302,19 +333,17 @@ test.describe('suggest-domains', () => {
     { tag: '@failure' },
     async ({ domainSearchWithHeaders }) => {
       const { WIX_ACCOUNT_ID } = getApiEnv();
-      const cases: { name: string; headers: Record<string, string> }[] = [
+      const cases = [
         { name: 'no API key', headers: {} },
-        {
-          name: 'invalid API key',
-          headers: { Authorization: 'invalid-api-key', 'wix-account-id': WIX_ACCOUNT_ID },
-        },
+        { name: 'invalid API key', headers: authHeaders(INVALID_API_KEY, WIX_ACCOUNT_ID) },
       ];
       for (const { name, headers } of cases) {
         await test.step(name, async () => {
           const client = await domainSearchWithHeaders(headers);
-          const response = await client.suggestDomains({ query: QUERY });
+          const response = await client.suggestDomains({ query: QUERIES.default });
           await expectClientError(response);
-          expect(await response.text()).not.toContain('"suggestions"');
+          const leaked = suggestDomainsResponseSchema.safeParse(await response.json());
+          expect(leaked.success, 'the body contains suggestions').toBe(false);
         });
       }
     },

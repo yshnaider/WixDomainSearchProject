@@ -50,6 +50,14 @@ export const checkDomainAvailabilityErrorCodeSchema = z.enum([
   'DOMAINS_UNSUPPORTED_TLD',
 ]);
 
+/** `field` values seen in validation errors. */
+export const VIOLATION_FIELDS = {
+  query: 'query',
+  tlds: 'tlds',
+  pagingLimit: 'paging.limit',
+  domain: 'domain',
+} as const;
+
 export const fieldViolationSchema = z.object({
   field: z.string(),
   description: z.string(),

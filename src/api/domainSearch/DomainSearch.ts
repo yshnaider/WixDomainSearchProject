@@ -4,6 +4,32 @@ import { toQueryString } from '../queryString';
 const SUGGEST_DOMAINS_PATH = '/domain-search/v2/suggest-domains';
 const CHECK_DOMAIN_AVAILABILITY_PATH = '/domain-search/v2/check-domain-availability';
 
+export const SUGGEST_DOMAINS_PARAMS = {
+  query: 'query',
+  tlds: 'tlds[]',
+  maxLength: 'maxLength',
+  pagingLimit: 'paging.limit',
+  pagingCursor: 'paging.cursor',
+} as const;
+
+export const CHECK_DOMAIN_AVAILABILITY_PARAMS = {
+  domain: 'domain',
+} as const;
+
+/** Documented input limits. */
+export const SUGGEST_DOMAINS_LIMITS = {
+  queryMinLength: 1,
+  queryMaxLength: 100,
+  pagingLimitMin: 1,
+  pagingLimitMax: 50,
+} as const;
+
+/** Documented input limits. */
+export const CHECK_DOMAIN_AVAILABILITY_LIMITS = {
+  domainMinLength: 3,
+  domainMaxLength: 63,
+} as const;
+
 export interface SuggestDomainsParams {
   query: string;
   /** TLDs without the dot, such as `com`. */
@@ -28,11 +54,11 @@ export class DomainSearch {
   suggestDomains(params: SuggestDomainsParams): Promise<APIResponse> {
     return this.suggestDomainsRaw(
       toQueryString({
-        query: params.query,
-        'tlds[]': params.tlds,
-        maxLength: params.maxLength,
-        'paging.limit': params.paging?.limit,
-        'paging.cursor': params.paging?.cursor,
+        [SUGGEST_DOMAINS_PARAMS.query]: params.query,
+        [SUGGEST_DOMAINS_PARAMS.tlds]: params.tlds,
+        [SUGGEST_DOMAINS_PARAMS.maxLength]: params.maxLength,
+        [SUGGEST_DOMAINS_PARAMS.pagingLimit]: params.paging?.limit,
+        [SUGGEST_DOMAINS_PARAMS.pagingCursor]: params.paging?.cursor,
       }),
     );
   }
@@ -43,7 +69,9 @@ export class DomainSearch {
   }
 
   checkDomainAvailability(params: CheckDomainAvailabilityParams): Promise<APIResponse> {
-    return this.checkDomainAvailabilityRaw(toQueryString({ domain: params.domain }));
+    return this.checkDomainAvailabilityRaw(
+      toQueryString({ [CHECK_DOMAIN_AVAILABILITY_PARAMS.domain]: params.domain }),
+    );
   }
 
   /** Sends a hand-built query string, for requests the typed params can't express. */

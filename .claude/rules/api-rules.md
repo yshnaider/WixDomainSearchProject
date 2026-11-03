@@ -7,6 +7,7 @@ Apply these when writing or changing API tests, API modules, or schemas.
 - Tag every test with `@smoke`, `@sanity`, `@edge`, or `@failure`, matching the Type column in `TEST_PLAN.md`.
 - Keep tests independent: no shared state, and no dependence on test order.
 - Don't assert numbers that aren't requirements. Check rules instead, such as "at least 1 result" and "no more than the requested limit".
+- Don't hardcode strings or numbers in tests. Put test inputs in `src/fixtures/testData.ts`; API contract values (parameter names, documented limits, violation fields) next to their API module; error codes in the schema enums; and shared constants such as HTTP statuses in `src/api/`. Test titles, tags, and assertion messages can stay inline.
 - Run new API tests against the real API. A pass against a stub is weak evidence.
 - Never weaken a test to make it pass. If a test finds a real problem, leave it failing and report it.
 
