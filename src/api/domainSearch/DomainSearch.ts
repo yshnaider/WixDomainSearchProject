@@ -43,8 +43,11 @@ export class DomainSearch {
   }
 
   checkDomainAvailability(params: CheckDomainAvailabilityParams): Promise<APIResponse> {
-    return this.request.get(
-      `${CHECK_DOMAIN_AVAILABILITY_PATH}?${toQueryString({ domain: params.domain })}`,
-    );
+    return this.checkDomainAvailabilityRaw(toQueryString({ domain: params.domain }));
+  }
+
+  /** Sends a hand-built query string, for requests the typed params can't express. */
+  checkDomainAvailabilityRaw(queryString: string): Promise<APIResponse> {
+    return this.request.get(`${CHECK_DOMAIN_AVAILABILITY_PATH}?${queryString}`);
   }
 }

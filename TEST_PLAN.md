@@ -265,7 +265,7 @@ All requests go to staging with a valid API key, unless a test says otherwise. "
 | --- | --- | --- | --- |
 | CA-01 | Smoke | `domain=google.com` (K1) | Success, `available: false` |
 | CA-02 | Smoke | `domain=` followed by G | Success, `available: true` |
-| CA-03 | Sanity | K1–K6 and G, one request each, with K5 sent as `xn--bcher-kva.com` | Each `available` value matches the registry: K1–K3, K5, K6, and G through registry RDAP, and K4 through ISOC-IL WHOIS. Registered means `available: false`. |
+| CA-03 | Sanity | K1–K5 and G, one request each, with K5 sent as `xn--bcher-kva.com`. K6 is left out because Wix doesn't sell its TLD (see CA-19). | Each `available` value matches the registry: K1–K3, K5, and G through registry RDAP, and K4 through ISOC-IL WHOIS. Registered means `available: false`. |
 | CA-04 | Sanity | Same as CA-03 | Every response includes premium status. |
 | CA-05 | Sanity | A premium domain supplied by the team | It's reported as premium. |
 | CA-06 | Edge | `domain=a.b` (3 characters, the minimum) | No 5xx, and never `available: true` |
@@ -281,6 +281,7 @@ All requests go to staging with a valid API key, unless a test says otherwise. "
 | CA-16 | Edge | `domain=sunnybakery` (no TLD) | 4xx, because the TLD is required |
 | CA-17 | Sanity | `domain=my-new-domain.com` (the documented example) | Success |
 | CA-18 | Failure | The CA-01 request with no API key, and then with an invalid key | 4xx, with no availability data in the body |
+| CA-19 | Edge | `domain=nasa.gov` (K6, a TLD Wix doesn't sell) | 400, with `DOMAINS_UNSUPPORTED_TLD` in `details.applicationError.code` |
 
 ### list-tlds
 
