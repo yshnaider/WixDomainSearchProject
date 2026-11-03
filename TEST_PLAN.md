@@ -42,14 +42,14 @@ This needs confirming with the team. Tests that rely on it say "clean rejection"
 1. The exact error behavior and status codes behind "clean rejection".
 2. Whether the `check-domain-availability` limit of 3–63 characters applies to the whole domain. A legal 63-character label plus `.com` is 67 characters, so the API would reject a valid domain (see U9).
 3. Whether `tlds[]` accepts multi-level TLDs such as `co.il`, given that values are "TLDs without the dot".
-4. Whether `pagingMetadata.count` is exact, and whether it stays the same on every page of a query.
+4. Whether `hasNext` and `cursors.next` always agree. [FINDINGS.md](FINDINGS.md) F-3 shows `hasNext: false` while more results exist.
 5. Whether `suggest-domains` returns only available domains.
 6. How premium domains are priced. ARCHITECTURE.md only documents pricing by TLD.
 7. Whether **Best match** and **Great alternative** are the first two items of the `suggest-domains` response, or chosen another way.
 8. What WHOIS Lookup does with a URL that includes a subdomain, such as `www.`.
 9. What a door shows when a TLD has no price entry.
 10. Whether queries are trimmed and lowercased before they're sent.
-11. How the last page is signaled. I assume `pagingMetadata.cursors.next` is absent.
+11. How the last page is signaled. In real responses, the last page has `hasNext: false` and only a `prev` cursor, with no `cursors.next`.
 12. Whether the Business Name Generator has an exclude-words field, and what content rules apply to its LLM output.
 13. The rate for production Smoke runs, and written permission for the Security tests.
 14. Whether the doors convert Unicode domains to punycode before calling `check-domain-availability`, which supports only letters, digits, hyphens, and dots.
@@ -74,8 +74,8 @@ This needs confirming with the team. Tests that rely on it say "clean rejection"
 **Result counts.** I never expect a fixed number of results. I expect:
 
 - At least 1 result.
-- No more results per page than the `paging.limit` sent, and no more in total than the response's `pagingMetadata.count`.
-- A load-more option only when the response's `pagingMetadata.count` exceeds the `paging.limit` sent to `suggest-domains`.
+- No more results per page than the `paging.limit` sent. `pagingMetadata.count` is the number of results on that page, not a total; the API doesn't return a total.
+- A load-more option only when the `suggest-domains` response has `pagingMetadata.hasNext: true`.
 
 ## Test Data
 
@@ -158,8 +158,8 @@ These tests check only what the page shows. Integrity checks compare it with the
 | SF-04 | Sanity | Open the page. (inferred) | The suggested TLDs match the `tld-promotions` response the page received. |
 | SF-05 | Sanity | Type Q3 and press Enter. | Every `.co.il` result uses the `co.il` price entry, not the `il` entry. |
 | SF-06 | Sanity | Type Q1 and press Enter. | The page called `check-domain-availability` with `domain=sunnybakery.com`. Because the step's position is inferred, I don't check the call order. |
-| SF-07 | Sanity | Type Q1, press Enter, and click load more while it's shown. | Load more appears only when `pagingMetadata.count` exceeds the `paging.limit` sent. Each click sends `paging.cursor` with the previous `pagingMetadata.cursors.next`. New results are appended with no duplicates, each with a price. Each page has no more results than `paging.limit`, and the total shown never exceeds `pagingMetadata.count`. |
-| SF-08 | Edge | Type Q1 with `suggest-domains` stubbed so that `pagingMetadata.count` doesn't exceed `paging.limit`. | Load more isn't shown. |
+| SF-07 | Sanity | Type Q1, press Enter, and click load more while it's shown. | Load more appears only when the latest response has `pagingMetadata.hasNext: true`. Each click sends `paging.cursor` with the previous `pagingMetadata.cursors.next`. New results are appended with no duplicates, each with a price. Each click adds no more results than `paging.limit`, and exactly that response's `pagingMetadata.count`. |
+| SF-08 | Edge | Type Q1 with `suggest-domains` stubbed to return `hasNext: false` and no `cursors.next`. | Load more isn't shown. |
 | SF-09 | Edge | Search B1 and B2. | Clean rejection. No `suggest-domains` request has an empty query. |
 | SF-10 | Edge | Search U4 and U5. | The results match Q1's. The request for U5 sends the trimmed value. |
 | SF-11 | Edge | Paste B10, and paste Q1 copied with a trailing line break. | One search runs, for the joined or trimmed value. |
@@ -229,11 +229,11 @@ All requests go to staging with a valid API key, unless a test says otherwise. "
 
 ### suggest-domains
 
-`GET https://www.wixapis.com/domain-search/v2/suggest-domains`. The `tlds[]` brackets are sent unencoded. I don't send `limit`, because it's deprecated: `paging.limit` sets the page size, and `pagingMetadata.count` in the response gives the total number of results.
+`GET https://www.wixapis.com/domain-search/v2/suggest-domains`. The `tlds[]` brackets are sent unencoded. I don't send `limit`, because it's deprecated: `paging.limit` sets the page size. In the response, `pagingMetadata.count` is the number of suggestions on that page, not a total, and `hasNext` says whether another page exists.
 
 | ID | Type | Request (query string) | Expected |
 | --- | --- | --- | --- |
-| SD-01 | Smoke | `query=sunnybakery&paging.limit=10` | Success, with at least 1 and at most 10 suggestions. `pagingMetadata.count` is at least the number of suggestions returned. |
+| SD-01 | Smoke | `query=sunnybakery&paging.limit=10` | Success, with at least 1 and at most 10 suggestions. `pagingMetadata.count` equals the number of suggestions returned. |
 | SD-02 | Sanity | Same as SD-01 | The response contains no prices. |
 | SD-03 | Edge | `query=a` (1 character, the minimum) | Success |
 | SD-04 | Edge | `query=` followed by `a×100` (the maximum) | Success |
@@ -250,7 +250,7 @@ All requests go to staging with a valid API key, unless a test says otherwise. "
 | SD-15 | Edge | `query=sunnybakery&maxLength=0`, `maxLength=-1`, and `maxLength=abc` | 4xx |
 | SD-16 | Edge | `query=sunnybakery&paging.limit=1`, and `paging.limit=50` | Success, with at most 1 and at most 50 suggestions. |
 | SD-17 | Edge | `query=sunnybakery&paging.limit=0`, and `paging.limit=51` | 4xx |
-| SD-18 | Sanity | `query=sunnybakery&paging.limit=5`, then repeat with `paging.cursor` set to each `pagingMetadata.cursors.next` until it's absent | Each page has at most 5 suggestions. No domain appears on more than one page. The total number of suggestions across all pages equals `pagingMetadata.count` (item 4). |
+| SD-18 | Sanity | `query=sunnybakery&paging.limit=5`, then repeat with `paging.cursor` set to each `pagingMetadata.cursors.next` until it's absent | Each page has at most 5 suggestions, and its `pagingMetadata.count` equals its number of suggestions. No domain appears on more than one page. `hasNext` is `true` on every page except the last (item 4). |
 | SD-19 | Edge | `query=sunnybakery&paging.cursor=garbage` | 4xx |
 | SD-20 | Edge | `query=greenleaf`, with `paging.cursor` taken from a `query=sunnybakery` response | 4xx, or only `greenleaf` results (confirm) |
 | SD-21 | Failure | The SD-01 request with no API key, and then with an invalid key | 4xx, with no suggestions in the body |

@@ -12,7 +12,8 @@ Apply these when writing or changing API tests, API modules, or schemas.
 
 ## API Modules and Schemas
 
-- API methods only send requests and return responses. Assertions belong in the tests, so negative tests can receive 4xx responses.
+- API methods only send requests and return responses. Assertions belong in the tests, so negative tests can receive 4xx responses. Don't make API methods throw on 4xx or 5xx.
+- Parse response bodies with `parseResponse` from `src/api/parseResponse.ts`, never with `response.json()` and `schema.parse()` directly. It fails with the status, path, and reason when a body isn't JSON or doesn't match the schema.
 - Keep Zod schemas next to their API module, and derive types with `z.infer`.
 - Check real responses before writing a schema. Label anything unconfirmed as inferred.
 

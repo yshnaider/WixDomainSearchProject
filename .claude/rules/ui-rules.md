@@ -15,6 +15,7 @@ Apply these when writing or changing UI tests or page objects.
 - Prefer Playwright's built-in locators (`getByRole`, `getByLabel`, `getByText`, `getByTestId`) and web-first assertions.
 - Wait for the page to load or render by waiting on a unique locator or a loading element.
 - Don't use fixed waits.
+- Don't wrap locators or actions in try/catch to hide failures. If a page model can detect a failed state, such as an error message instead of results, throw an error that names that state.
 
 ## Safety
 

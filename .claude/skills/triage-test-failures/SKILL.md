@@ -36,3 +36,4 @@ If there's no input, use the failures from the latest test run.
 - Don't hide failures with skips, `test.fail`, retries, or longer timeouts.
 - Don't count a pass against a stub as evidence.
 - If you replace bad test data that exposed a real issue, keep a test for that issue.
+- If a failure message doesn't say what failed and where, treat it as a code bug: add error handling that does, following the Error Handling section of `CLAUDE.md`.

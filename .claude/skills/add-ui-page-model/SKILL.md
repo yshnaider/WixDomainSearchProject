@@ -17,7 +17,7 @@ If the Playwright MCP tools aren't available, stop and tell the user to enable t
 2. Interact only as much as needed to see each state. Don't sign in, buy anything, or select **Get it**. Use only non-hostile input.
 3. Note each element's role, accessible name, and changing states.
 4. Put page models in `src/ui/pages/` and shared components in `src/ui/components/`. Reuse existing components.
-5. Write a class that takes a `Page`, with `readonly` locators set in the constructor, role-based where possible, and methods named after user actions. After navigation or rendering, wait on a unique locator to confirm the page has loaded. Don't add assertions or fixed waits.
+5. Write a class that takes a `Page`, with `readonly` locators set in the constructor, role-based where possible, and methods named after user actions. After navigation or rendering, wait on a unique locator to confirm the page has loaded. Don't add assertions or fixed waits. Where the page can show a failed state, throw an error that names it, as `ui-rules.md` describes.
 6. Add the model to `src/fixtures/ui.fixture.ts`. Create the fixture file if it's missing.
 7. Create `tests/ui/<name>.spec.ts` with only 2 or 3 `@sanity` tests.
 8. Run `npm run typecheck`, `npm run lint`, and `npm run format:check`, and fix any problems.

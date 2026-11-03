@@ -14,7 +14,7 @@ Follow `.claude/rules/api-rules.md`.
 1. If `src/api/domainSearch/DomainSearch.ts` has no method for this endpoint, stop and tell the user to run `/add-api-endpoint` first.
 2. Read the endpoint's subsection under API Tests in `TEST_PLAN.md`, plus Test Data. If there's no subsection, stop and say so. Don't cover Security Tests.
 3. If `BASE_URL` points to production, say how many non-Smoke tests would run there, and wait for confirmation. Ask if you can't tell.
-4. Add a test for every plan row to `tests/api/<endpoint-name>.spec.ts`, tagged from the row's Type column. Validate every response body with the endpoint's Zod schemas: the success schema for 2xx responses and the error schema for 4xx responses. Don't check only the status. If a row can't be automated, leave it out and note why.
+4. Add a test for every plan row to `tests/api/<endpoint-name>.spec.ts`, tagged from the row's Type column. Validate every response body with `parseResponse` and the endpoint's Zod schemas: the success schema for 2xx responses and the error schema for 4xx responses. Don't check only the status. If a row can't be automated, leave it out and note why.
 5. Run `npm run typecheck`, `npm run lint`, and `npm run format:check`, and fix any problems.
 6. Run the loop below.
 7. Run the tests once more to confirm the results are stable. If any result changes, treat that test as flaky and find the cause.

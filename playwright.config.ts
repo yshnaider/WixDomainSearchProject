@@ -23,10 +23,17 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
 
-  /* Chromium only: TEST_PLAN.md leaves cross-browser coverage out. */
   projects: [
     {
+      name: 'api',
+      testDir: './tests/api',
+      /* Traces record request headers, which include the API key. */
+      use: { trace: 'off' },
+    },
+    /* Chromium only: TEST_PLAN.md leaves cross-browser coverage out. */
+    {
       name: 'chromium',
+      testDir: './tests/ui',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
