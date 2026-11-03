@@ -76,7 +76,7 @@ Every result shows its original price and its discount.
 
 ### Business Name Generator
 
-This flow is confirmed.
+This flow is confirmed. The generator likely uses an LLM to produce the names (inferred).
 
 1. The user describes their business in a text box and selects **Generate names**.
 2. The page sends the description as the query in a POST request to `business-names/generate`, which returns a list of business names.
