@@ -6,6 +6,9 @@ node_modules/
 /playwright/.cache/
 /playwright/.auth/
 
+# Playwright MCP page snapshots
+.playwright-mcp/
+
 # Secrets (API keys); commit a .env.example with placeholder values instead
 .env
 .env.*
