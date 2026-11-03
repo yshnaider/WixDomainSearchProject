@@ -2,6 +2,7 @@ import type { APIRequestContext, APIResponse } from '@playwright/test';
 import { toQueryString } from '../queryString';
 
 const SUGGEST_DOMAINS_PATH = '/domain-search/v2/suggest-domains';
+const CHECK_DOMAIN_AVAILABILITY_PATH = '/domain-search/v2/check-domain-availability';
 
 export interface SuggestDomainsParams {
   query: string;
@@ -16,17 +17,34 @@ export interface SuggestDomainsParams {
   };
 }
 
+export interface CheckDomainAvailabilityParams {
+  /** Domain with its TLD, in punycode, such as `my-new-domain.com`. */
+  domain: string;
+}
+
 export class DomainSearch {
   constructor(private readonly request: APIRequestContext) {}
 
   suggestDomains(params: SuggestDomainsParams): Promise<APIResponse> {
-    const query = toQueryString({
-      query: params.query,
-      'tlds[]': params.tlds,
-      maxLength: params.maxLength,
-      'paging.limit': params.paging?.limit,
-      'paging.cursor': params.paging?.cursor,
-    });
-    return this.request.get(`${SUGGEST_DOMAINS_PATH}?${query}`);
+    return this.suggestDomainsRaw(
+      toQueryString({
+        query: params.query,
+        'tlds[]': params.tlds,
+        maxLength: params.maxLength,
+        'paging.limit': params.paging?.limit,
+        'paging.cursor': params.paging?.cursor,
+      }),
+    );
+  }
+
+  /** Sends a hand-built query string, for requests the typed params can't express. */
+  suggestDomainsRaw(queryString: string): Promise<APIResponse> {
+    return this.request.get(`${SUGGEST_DOMAINS_PATH}?${queryString}`);
+  }
+
+  checkDomainAvailability(params: CheckDomainAvailabilityParams): Promise<APIResponse> {
+    return this.request.get(
+      `${CHECK_DOMAIN_AVAILABILITY_PATH}?${toQueryString({ domain: params.domain })}`,
+    );
   }
 }

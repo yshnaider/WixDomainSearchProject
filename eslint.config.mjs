@@ -33,6 +33,8 @@ export default defineConfig(
       // Fixed waits and network-idle waits make tests flaky.
       'playwright/no-wait-for-timeout': 'error',
       'playwright/no-networkidle': 'error',
+      // Helpers named expect* assert on behalf of the test.
+      'playwright/expect-expect': ['warn', { assertFunctionPatterns: ['^expect[A-Z]'] }],
     },
   },
   // Last, so it turns off rules that conflict with Prettier.

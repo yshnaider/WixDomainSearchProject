@@ -5,6 +5,8 @@ import { getApiEnv } from '../config/env';
 interface ApiFixtures {
   apiRequest: APIRequestContext;
   domainSearch: DomainSearch;
+  /** Creates a client that sends only the given headers, for authentication tests. */
+  domainSearchWithHeaders: (headers: Record<string, string>) => Promise<DomainSearch>;
 }
 
 export const test = base.extend<ApiFixtures>({
@@ -22,6 +24,19 @@ export const test = base.extend<ApiFixtures>({
   },
   domainSearch: async ({ apiRequest }, use) => {
     await use(new DomainSearch(apiRequest));
+  },
+  domainSearchWithHeaders: async ({ playwright }, use) => {
+    const { BASE_URL } = getApiEnv();
+    const contexts: APIRequestContext[] = [];
+    await use(async (headers) => {
+      const request = await playwright.request.newContext({
+        baseURL: BASE_URL,
+        extraHTTPHeaders: headers,
+      });
+      contexts.push(request);
+      return new DomainSearch(request);
+    });
+    await Promise.all(contexts.map((request) => request.dispose()));
   },
 });
 

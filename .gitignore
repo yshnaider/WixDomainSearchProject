@@ -9,6 +9,9 @@ node_modules/
 # Playwright MCP page snapshots
 .playwright-mcp/
 
+# Claude Code personal settings (local permission approvals)
+.claude/settings.local.json
+
 # Secrets (API keys); commit a .env.example with placeholder values instead
 .env
 .env.*

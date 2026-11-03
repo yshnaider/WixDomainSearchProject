@@ -19,7 +19,7 @@ export async function parseResponse<T extends z.ZodType>(
     json = JSON.parse(text);
   } catch {
     throw new Error(
-      `Expected a JSON body from ${source}, got: ${text.slice(0, BODY_EXCERPT_LENGTH)}`,
+      `Expected a JSON body from ${source}, got: ${text.slice(0, BODY_EXCERPT_LENGTH) || '(empty body)'}`,
     );
   }
 

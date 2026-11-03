@@ -4,7 +4,7 @@ Apply these when writing or changing API tests, API modules, or schemas.
 
 ## Tests
 
-- Tag every test with `@smoke`, `@sanity`, or `@edge`, matching the Type column in `TEST_PLAN.md`.
+- Tag every test with `@smoke`, `@sanity`, `@edge`, or `@failure`, matching the Type column in `TEST_PLAN.md`.
 - Keep tests independent: no shared state, and no dependence on test order.
 - Don't assert numbers that aren't requirements. Check rules instead, such as "at least 1 result" and "no more than the requested limit".
 - Run new API tests against the real API. A pass against a stub is weak evidence.
