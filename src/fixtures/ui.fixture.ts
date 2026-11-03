@@ -1,12 +1,14 @@
 import { test as base } from '@playwright/test';
 import { ApiStubs } from '../ui/ApiStubs';
 import { ApiTraffic } from '../ui/ApiTraffic';
+import { DomainResultsPage } from '../ui/pages/DomainResultsPage';
 import { WhoisLookupPage } from '../ui/pages/WhoisLookupPage';
 import { WhoisResultsPage } from '../ui/pages/WhoisResultsPage';
 
 interface UiFixtures {
   apiTraffic: ApiTraffic;
   apiStubs: ApiStubs;
+  domainResultsPage: DomainResultsPage;
   whoisLookupPage: WhoisLookupPage;
   whoisResultsPage: WhoisResultsPage;
 }
@@ -18,6 +20,9 @@ export const test = base.extend<UiFixtures>({
   },
   apiStubs: async ({ page }, use) => {
     await use(new ApiStubs(page));
+  },
+  domainResultsPage: async ({ page }, use) => {
+    await use(new DomainResultsPage(page));
   },
   whoisLookupPage: async ({ page }, use) => {
     await use(new WhoisLookupPage(page));

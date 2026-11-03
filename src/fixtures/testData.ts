@@ -1,3 +1,4 @@
+import { SUGGEST_DOMAINS_LIMITS } from '../api/domainSearch/DomainSearch';
 import { DOMAIN_PATTERN } from '../utils/domain';
 
 /** Every successful search must return at least this many results. */
@@ -34,6 +35,12 @@ export const PAGE_SIZES = {
 
 /** How late a delayed response arrives in the plan's timing tests (SF-16, BN-14, WH-11). */
 export const SLOW_RESPONSE_MS = 3000;
+
+/** Bodies for stubbed failures. */
+export const STUB_BODIES = {
+  error: { message: 'Stubbed failure' },
+  invalidJson: '{not json',
+} as const;
 
 /** Values that aren't valid positive numbers. */
 export const INVALID_NUMBERS = ['0', '-1', 'abc'] as const;
@@ -118,6 +125,26 @@ export const BAD_DOMAINS = [
   { id: 'B19', input: '192.0.2.1' },
   { id: 'B20', input: '[2001:db8::1]' },
 ] as const;
+
+/** All rows B1–B21 of the Bad and Unusual Input table, for search boxes. */
+export const BAD_INPUTS = [
+  { id: 'B1', input: QUERIES.empty },
+  { id: 'B2', input: QUERIES.spacesOnly },
+  ...BAD_DOMAINS,
+  { id: 'B21', input: stringOfLength(SUGGEST_DOMAINS_LIMITS.queryMaxLength + 1) },
+] as const;
+
+/** Inputs for the WHOIS Lookup rows (TEST_PLAN.md's Search Inputs and Unusual rows). */
+export const WHOIS_INPUTS = {
+  /** WH-04: a URL with a subdomain and a path. */
+  url: 'https://www.wikipedia.org/wiki/Main_Page',
+  /** The domain WH-04's URL should be looked up as. */
+  urlDomain: 'wikipedia.org',
+  /** Q1. */
+  q1: 'sunnybakery.com',
+  /** U4: Q1 in mixed case. */
+  mixedCaseQ1: 'SunnyBakery.COM',
+} as const;
 
 /** Row U9: a legal 63-character label, which makes a 67-character domain. */
 export const MAX_LABEL_DOMAIN = `${MAX_LABEL}.${TLDS.com}`;

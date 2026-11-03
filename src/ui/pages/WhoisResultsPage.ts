@@ -1,33 +1,55 @@
 import type { Locator, Page } from '@playwright/test';
 import { DomainOfferCard } from '../components/DomainOfferCard';
+import { DomainSearchBox } from '../components/DomainSearchBox';
 import { PATHS, RESULT_QUERY_PARAMS } from '../paths';
 
 /** WHOIS results for a registered domain: its WHOIS sections, then alternatives to buy. */
 export class WhoisResultsPage {
+  /** What a WHOIS field shows when it has no value. */
+  static readonly MISSING_VALUE = '—';
+
   readonly heading: Locator;
   readonly noDomainMessage: Locator;
-  readonly searchBox: Locator;
+  readonly search: DomainSearchBox;
   readonly domainInformation: Locator;
   readonly registrarInformation: Locator;
   readonly registrantContactInformation: Locator;
+  /** Each section: its heading and its label/value rows. */
+  readonly domainSection: Locator;
+  readonly registrarSection: Locator;
+  readonly registrantSection: Locator;
+  readonly rawRegistryData: Locator;
+  readonly rawRegistrarData: Locator;
   readonly brokerBanner: Locator;
   readonly alternativesHeading: Locator;
   readonly offerCards: Locator;
+  /** No error message has been seen on this page yet, so this locator is inferred. */
+  readonly errorMessage: Locator;
 
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'WHOIS search results' });
     this.noDomainMessage = page.getByText('No domain specified.');
-    this.searchBox = page.getByTestId('module-coreDomainSearch-searchInput').getByRole('textbox');
+    this.search = new DomainSearchBox(page);
     this.domainInformation = page.getByRole('heading', { name: 'Domain Information' });
     this.registrarInformation = page.getByRole('heading', { name: 'Registrar Information' });
     this.registrantContactInformation = page.getByRole('heading', {
       name: 'Registrant Contact Information',
     });
+    this.domainSection = this.domainInformation.locator('..');
+    this.registrarSection = this.registrarInformation.locator('..');
+    this.registrantSection = this.registrantContactInformation.locator('..');
+    this.rawRegistryData = page
+      .getByTestId('accordion-item')
+      .filter({ hasText: 'Raw Registry WHOIS Data' });
+    this.rawRegistrarData = page
+      .getByTestId('accordion-item')
+      .filter({ hasText: 'Raw Registrar WHOIS Data' });
     this.brokerBanner = page.getByTestId('searched-domain-broker');
     this.alternativesHeading = page.getByRole('heading', {
       name: 'Explore these great alternatives',
     });
     this.offerCards = page.getByTestId(/^undefined-item-\d+$/);
+    this.errorMessage = page.getByRole('alert');
   }
 
   domainHeading(domain: string): Locator {
@@ -57,10 +79,6 @@ export class WhoisResultsPage {
   /** Waits for the alternatives, and returns one card per offer. */
   async offers(): Promise<DomainOfferCard[]> {
     await this.offerCards.first().waitFor();
-    const count = await this.offerCards.count();
-    return Array.from(
-      { length: count },
-      (_, index) => new DomainOfferCard(this.offerCards.nth(index)),
-    );
+    return DomainOfferCard.all(this.offerCards);
   }
 }

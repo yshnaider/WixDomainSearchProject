@@ -95,7 +95,7 @@ The user enters a domain name or URL to check the domain's owner, availability, 
 
 1. The page checks the domain with `check-domain-availability`.
 2. The `available` field determines the result:
-   - `available: true`: the domain doesn't exist. The page shows the exact match first, followed by a paginated list of priced alternatives.
+   - `available: true`: the domain doesn't exist. The page redirects to the Domain Storefront's results page (`/domain/result/?q={domain}`), which shows the exact match first, followed by a paginated list of priced alternatives.
    - `available: false`: the domain exists (it's occupied). The page shows its owner and registration info from `structured-domain-info/whois`, plus a list of available alternatives to purchase.
 
 ## Public Domain Search API

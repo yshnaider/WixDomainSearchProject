@@ -202,17 +202,17 @@ I never check for specific generated names. D2 can produce FurryNest, but it doe
 | ID | Type | Input / steps | Expected |
 | --- | --- | --- | --- |
 | WH-01 | Smoke | Look up K1. | `available: false`, so the page shows the exists state: owner and registration info sections, plus a list of available alternatives. Integrity check passes, and the sections are filled from the `structured-domain-info/whois` response. |
-| WH-02 | Smoke | Look up G. | `available: true`, so the page shows the exact match first, followed by a paginated list of priced alternatives. Integrity check passes. |
+| WH-02 | Smoke | Look up G. | `available: true`, so the page redirects to the Storefront results page, which shows the exact match first, followed by a paginated list of priced alternatives. Integrity check passes. |
 | WH-03 | Sanity | Look up K2–K6. | Each shows the exists state with its owner and registration sections. Values aren't checked. |
 | WH-04 | Sanity | Look up `https://www.wikipedia.org/wiki/Main_Page`. | The page looks up `wikipedia.org` and shows the exists state. Subdomain handling needs confirming (item 8). |
-| WH-05 | Sanity | Look up G, then click load more on the alternatives. | Follows the same load-more rules as SF-07. |
+| WH-05 | Sanity | Look up G, then click load more on the alternatives of the Storefront results page it redirects to. | Follows the same load-more rules as SF-07. |
 | WH-06 | Edge | Look up U4 and `GOOGLE.COM`, then U6 and U7. | U4 matches Q1's state, and `GOOGLE.COM` matches K1's. U6 and U7 show the same state, and both send `domain=xn--bcher-kva.com` to `check-domain-availability`. |
 | WH-07 | Edge | Look up B1–B21. | Clean rejection. No domain is shown as available or priced. |
 | WH-08 | Failure | Look up K1 with the `structured-domain-info/whois` response stubbed to leave out the owner data. | The page shows the sections it has and marks the missing ones. Availability is still shown, and the page doesn't crash. |
 | WH-09 | Failure | Look up K1 with `structured-domain-info/whois` stubbed to return a 500, and then to time out. | The exists state shows a message instead of the registration info. The alternatives are still shown. |
 | WH-10 | Failure | Look up K1 with `check-domain-availability` stubbed to return a 500, a 429, a timeout, and invalid JSON (one run each). | Clean rejection. The page shows neither the exists state nor the available state. |
 | WH-11 | Failure | Look up K1 with all of its responses delayed by 3 seconds, then look up G right away. | Only G's result is shown. |
-| WH-12 | Failure | Look up G, then click load more on the alternatives with the next page stubbed to return a 500. | The loaded alternatives stay, and a message appears. |
+| WH-12 | Failure | Look up G, then click load more on the alternatives of the Storefront results page it redirects to, with the next page stubbed to return a 500. | The loaded alternatives stay, and a message appears. |
 
 ## UI Cross-Door Tests
 
