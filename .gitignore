@@ -1,4 +1,3 @@
-
 # Playwright
 node_modules/
 /test-results/
@@ -6,3 +5,15 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Secrets (API keys); commit a .env.example with placeholder values instead
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
